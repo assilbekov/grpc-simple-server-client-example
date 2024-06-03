@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"grpc-simple-server-client-example/api/proto/streaming_example"
 	"log"
 	"net"
@@ -15,6 +17,19 @@ type routeGuideServer struct {
 
 	mu         sync.Mutex
 	routeNotes map[string][]*streaming_example.RouteNote
+}
+
+func (r *routeGuideServer) GetFeature(
+	ctx context.Context,
+	point *streaming_example.Point,
+) (*streaming_example.Feature, error) {
+	for _, feature := range r.savedFeatures {
+		if proto.Equal(feature.Location, point) {
+			return feature, nil
+		}
+	}
+
+	return &streaming_example.Feature{Location: point}, nil
 }
 
 func (r *routeGuideServer) loadFeatures() {
