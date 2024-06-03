@@ -33,6 +33,7 @@ func printFeatures(client streaming_example.RouteGuideClient, rect *streaming_ex
 	if err != nil {
 		log.Fatalf("%v.ListFeatures(_) = _, %v", client, err)
 	}
+
 	for {
 		feature, err := stream.Recv()
 		if err == io.EOF {

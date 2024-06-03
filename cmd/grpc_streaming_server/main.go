@@ -125,6 +125,25 @@ func (s *routeGuideServer) RouteChat(stream streaming_example.RouteGuide_RouteCh
 	}
 }
 
+func main() {
+	lis, err := net.Listen("tcp", "localhost:50051")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	streaming_example.RegisterRouteGuideServer(grpcServer, newServer())
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
+
+func newServer() *routeGuideServer {
+	s := &routeGuideServer{}
+	s.loadFeatures()
+	return s
+}
+
 func (r *routeGuideServer) loadFeatures() {
 	if err := json.Unmarshal(exampleData, &r.savedFeatures); err != nil {
 		log.Fatalf("Failed to load default features: %v", err)
@@ -172,25 +191,6 @@ func calcDistance(p1, p2 *streaming_example.Point) int32 {
 
 func serialize(point *streaming_example.Point) string {
 	return fmt.Sprintf("%d %d", point.Latitude, point.Longitude)
-}
-
-func main() {
-	lis, err := net.Listen("tcp", "localhost:50051")
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	grpcServer := grpc.NewServer()
-	streaming_example.RegisterRouteGuideServer(grpcServer, newServer())
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
-}
-
-func newServer() *routeGuideServer {
-	s := &routeGuideServer{}
-	s.loadFeatures()
-	return s
 }
 
 // exampleData is a copy of testdata/route_guide_db.json. It's to avoid
