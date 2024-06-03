@@ -40,6 +40,14 @@ func (r *routeGuideServer) ListFeatures(
 	rect *streaming_example.Rectangle,
 	stream streaming_example.RouteGuide_ListFeaturesServer,
 ) error {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Printf("recovered from panic: %v", err)
+			stream.Send(&streaming_example.Feature{
+				Name: "error",
+			})
+		}
+	}()
 	for _, feature := range r.savedFeatures {
 		if inRange(feature.Location, rect) {
 			if err := stream.Send(feature); err != nil {
