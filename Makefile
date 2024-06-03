@@ -9,3 +9,6 @@ start_streaming_server:
 
 start_client:
 	go run cmd/grpc_client/main.go
+
+start_streaming_client:
+	go run cmd/grpc_streaming_client/main.go
