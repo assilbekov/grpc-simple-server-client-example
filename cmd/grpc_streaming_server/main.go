@@ -18,10 +18,15 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	streaming_example.RegisterRouteGuideServer(grpcServer, &routeGuideServer{})
+	streaming_example.RegisterRouteGuideServer(grpcServer, newServer())
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+}
+
+func newServer() *routeGuideServer {
+	s := &routeGuideServer{}
+	return s
 }
 
 // exampleData is a copy of testdata/route_guide_db.json. It's to avoid
