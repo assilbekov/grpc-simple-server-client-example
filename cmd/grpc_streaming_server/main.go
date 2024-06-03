@@ -7,10 +7,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"grpc-simple-server-client-example/api/proto/streaming_example"
+	"io"
 	"log"
 	"math"
 	"net"
 	"sync"
+	"time"
 )
 
 type routeGuideServer struct {
@@ -48,6 +50,72 @@ func (r *routeGuideServer) ListFeatures(
 	return nil
 }
 
+// RecordRoute records a route composited of a sequence of points.
+//
+// It gets a stream of points, and responds with statistics about the "trip":
+// number of points,  number of known features visited, total distance traveled, and
+// total time spent.
+func (s *routeGuideServer) RecordRoute(stream streaming_example.RouteGuide_RecordRouteServer) error {
+	var pointCount, featureCount, distance int32
+	var lastPoint *streaming_example.Point
+	startTime := time.Now()
+	for {
+		point, err := stream.Recv()
+		if err == io.EOF {
+			endTime := time.Now()
+			return stream.SendAndClose(&streaming_example.RouteSummary{
+				PointCount:   pointCount,
+				FeatureCount: featureCount,
+				Distance:     distance,
+				ElapsedTime:  int32(endTime.Sub(startTime).Seconds()),
+			})
+		}
+		if err != nil {
+			return err
+		}
+		pointCount++
+		for _, feature := range s.savedFeatures {
+			if proto.Equal(feature.Location, point) {
+				featureCount++
+			}
+		}
+		if lastPoint != nil {
+			distance += calcDistance(lastPoint, point)
+		}
+		lastPoint = point
+	}
+}
+
+// RouteChat receives a stream of message/location pairs, and responds with a stream of all
+// previous messages at each of those locations.
+func (s *routeGuideServer) RouteChat(stream streaming_example.RouteGuide_RouteChatServer) error {
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		key := serialize(in.Location)
+
+		s.mu.Lock()
+		s.routeNotes[key] = append(s.routeNotes[key], in)
+		// Note: this copy prevents blocking other clients while serving this one.
+		// We don't need to do a deep copy, because elements in the slice are
+		// insert-only and never modified.
+		rn := make([]*streaming_example.RouteNote, len(s.routeNotes[key]))
+		copy(rn, s.routeNotes[key])
+		s.mu.Unlock()
+
+		for _, note := range rn {
+			if err := stream.Send(note); err != nil {
+				return err
+			}
+		}
+	}
+}
+
 func (r *routeGuideServer) loadFeatures() {
 	if err := json.Unmarshal(exampleData, &r.savedFeatures); err != nil {
 		log.Fatalf("Failed to load default features: %v", err)
@@ -74,7 +142,7 @@ func toRadians(num float64) float64 {
 	return num * math.Pi / float64(180)
 }
 
-func calculateDistance(p1, p2 *streaming_example.Point) int32 {
+func calcDistance(p1, p2 *streaming_example.Point) int32 {
 	const CordFactor float64 = 1e7
 	const R = float64(6371000) // earth radius in metres
 	lat1 := toRadians(float64(p1.Latitude) / CordFactor)
