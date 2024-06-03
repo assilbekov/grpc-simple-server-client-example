@@ -1,14 +1,26 @@
 package main
 
 import (
+	"encoding/json"
 	"google.golang.org/grpc"
 	"grpc-simple-server-client-example/api/proto/streaming_example"
 	"log"
 	"net"
+	"sync"
 )
 
 type routeGuideServer struct {
 	streaming_example.UnimplementedRouteGuideServer
+	savedFeatures []*streaming_example.Feature
+
+	mu         sync.Mutex
+	routeNotes map[string][]*streaming_example.RouteNote
+}
+
+func (r *routeGuideServer) loadFeatures() {
+	if err := json.Unmarshal(exampleData, &r.savedFeatures); err != nil {
+		log.Fatalf("Failed to load default features: %v", err)
+	}
 }
 
 func main() {
@@ -26,6 +38,7 @@ func main() {
 
 func newServer() *routeGuideServer {
 	s := &routeGuideServer{}
+	s.loadFeatures()
 	return s
 }
 
