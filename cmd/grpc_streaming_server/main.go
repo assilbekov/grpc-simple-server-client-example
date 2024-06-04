@@ -11,12 +11,16 @@ import (
 	"log"
 	"math"
 	"net"
+	"sync"
 	"time"
 )
 
 type routeGuideServer struct {
 	streaming_example.UnimplementedRouteGuideServer
 	savedFeatures []*streaming_example.Feature
+
+	mu         sync.Mutex
+	routeNodes map[string][]*streaming_example.RouteNote
 }
 
 func (r *routeGuideServer) GetFeature(
@@ -89,6 +93,38 @@ func (s *routeGuideServer) RecordRoute(stream streaming_example.RouteGuide_Recor
 			distance += calcDistance(lastPoint, point)
 		}
 		lastPoint = point
+	}
+}
+
+// RouteChat receives a stream of message/location pairs, and responds with a stream of all
+// previous messages at each of those locations.
+func (s *routeGuideServer) RouteChat(stream streaming_example.RouteGuide_RouteChatServer) error {
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			fmt.Println("EOF in RouteChat")
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("RouteChat: %v", err)
+		}
+		key := serialize(in.Location)
+
+		s.mu.Lock()
+		s.routeNodes[key] = append(s.routeNodes[key], in)
+		// Note: this copy prevents blocking other clients while serving this one.
+		// We don't need to do a deep copy, because elements in the slice are
+		// insert-only and never modified.
+		rn := make([]*streaming_example.RouteNote, len(s.routeNodes[key]))
+		copy(rn, s.routeNodes[key])
+		s.mu.Unlock()
+
+		for _, note := range rn {
+			if err := stream.Send(note); err != nil {
+				fmt.Println("error in RouteChat")
+				return err
+			}
+		}
 	}
 }
 
