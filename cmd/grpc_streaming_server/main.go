@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"grpc-simple-server-client-example/api/proto/streaming_example"
+	"io"
 	"log"
 	"math"
 	"net"
@@ -52,6 +53,43 @@ func (r *routeGuideServer) ListFeatures(
 		}
 	}
 	return nil
+}
+
+// RecordRoute records a route composited of a sequence of points.
+//
+// It gets a stream of points, and responds with statistics about the "trip":
+// number of points,  number of known features visited, total distance traveled, and
+// total time spent.
+func (s *routeGuideServer) RouteChat(stream streaming_example.RouteGuide_RecordRouteServer) error {
+	var pointCount, featureCount, distance int32
+	var lastPoint *streaming_example.Point
+	startTime := time.Now()
+
+	for {
+		point, err := stream.Recv()
+		if err == io.EOF {
+			endTime := time.Now()
+			return stream.SendAndClose(&streaming_example.RouteSummary{
+				PointCount:   pointCount,
+				FeatureCount: featureCount,
+				Distance:     distance,
+				ElapsedTime:  int32(endTime.Sub(startTime).Seconds()),
+			})
+		}
+		if err != nil {
+			return fmt.Errorf("RouteChat: %v", err)
+		}
+		pointCount++
+		for _, feature := range s.savedFeatures {
+			if proto.Equal(feature.Location, point) {
+				featureCount++
+			}
+		}
+		if lastPoint != nil {
+			distance += calcDistance(lastPoint, point)
+		}
+		lastPoint = point
+	}
 }
 
 func main() {
