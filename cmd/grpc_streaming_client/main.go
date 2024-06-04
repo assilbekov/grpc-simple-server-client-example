@@ -47,6 +47,36 @@ func printFeatures(client streaming_example.RouteGuideClient, rect *streaming_ex
 	}
 }
 
+// runRecordRoute sends a sequence of points to server and expects to get a RouteSummary from server.
+func runRecordRoute(client streaming_example.RouteGuideClient) {
+	// Create a random number of random points
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	pointCount := int(r.Int31n(100)) + 2 // Traverse at least two points
+	var points []*streaming_example.Point
+	for i := 0; i < pointCount; i++ {
+		points = append(points, randomPoint(r))
+	}
+	log.Printf("Traversing %d points.", len(points))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	stream, err := client.RecordRoute(ctx)
+	if err != nil {
+		log.Fatalf("client.RecordRoute failed: %v", err)
+	}
+	for _, point := range points {
+		if err := stream.Send(point); err != nil {
+			log.Fatalf("client.RecordRoute: stream.Send(%v) failed: %v", point, err)
+		}
+	}
+
+	reply, err := stream.CloseAndRecv()
+	if err != nil {
+		log.Fatalf("client.RecordRoute failed: %v", err)
+	}
+	log.Printf("Route summary: %v", reply)
+}
+
 func randomPoint(r *rand.Rand) *streaming_example.Point {
 	lat := (r.Int31n(180) - 90) * 1e7
 	long := (r.Int31n(360) - 180) * 1e7
@@ -76,8 +106,11 @@ func main() {
 	printFeature(client, &streaming_example.Point{Latitude: 0, Longitude: 0})
 
 	// Looking for features between 40, -75 and 42, -73.
-	printFeatures(client, &streaming_example.Rectangle{
+	/*printFeatures(client, &streaming_example.Rectangle{
 		Lo: &streaming_example.Point{Latitude: 400000000, Longitude: -750000000},
 		Hi: &streaming_example.Point{Latitude: 420000000, Longitude: -730000000},
-	})
+	})*/
+
+	// RecordRoute
+	runRecordRoute(client)
 }
