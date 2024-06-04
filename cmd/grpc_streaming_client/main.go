@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -38,6 +39,10 @@ func printFeatures(client streaming_example.RouteGuideClient, rect *streaming_ex
 		feature, err := stream.Recv()
 		if err == io.EOF {
 			fmt.Println("EOF")
+			break
+		}
+		if errors.As(err, &context.Canceled) {
+			fmt.Println("Canceled")
 			break
 		}
 		if err != nil {
@@ -106,10 +111,10 @@ func main() {
 	printFeature(client, &streaming_example.Point{Latitude: 0, Longitude: 0})
 
 	// Looking for features between 40, -75 and 42, -73.
-	/*printFeatures(client, &streaming_example.Rectangle{
+	printFeatures(client, &streaming_example.Rectangle{
 		Lo: &streaming_example.Point{Latitude: 400000000, Longitude: -750000000},
 		Hi: &streaming_example.Point{Latitude: 420000000, Longitude: -730000000},
-	})*/
+	})
 
 	// RecordRoute
 	runRecordRoute(client)

@@ -46,10 +46,10 @@ func (r *routeGuideServer) ListFeatures(
 	}()
 	for _, feature := range r.savedFeatures {
 		if inRange(feature.Location, rect) {
-			time.Sleep(1 * time.Second)
 			if err := stream.Send(feature); err != nil {
 				return err
 			}
+			time.Sleep(1 * time.Second)
 		}
 	}
 	return nil
