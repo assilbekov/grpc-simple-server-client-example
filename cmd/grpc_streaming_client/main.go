@@ -82,6 +82,45 @@ func runRecordRoute(client streaming_example.RouteGuideClient) {
 	log.Printf("Route summary: %v", reply)
 }
 
+// runRouteChat receives a sequence of route notes, while sending notes for various locations.
+func runRouteChat(client streaming_example.RouteGuideClient) {
+	notes := []*streaming_example.RouteNote{
+		{Location: &streaming_example.Point{Latitude: 0, Longitude: 1}, Message: "First message"},
+		{Location: &streaming_example.Point{Latitude: 0, Longitude: 2}, Message: "Second message"},
+		{Location: &streaming_example.Point{Latitude: 0, Longitude: 3}, Message: "Third message"},
+		{Location: &streaming_example.Point{Latitude: 0, Longitude: 1}, Message: "Fourth message"},
+		{Location: &streaming_example.Point{Latitude: 0, Longitude: 2}, Message: "Fifth message"},
+		{Location: &streaming_example.Point{Latitude: 0, Longitude: 3}, Message: "Sixth message"},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stream, err := client.RouteChat(ctx)
+	if err != nil {
+		log.Fatalf("client.RouteChat failed: %v", err)
+	}
+	waitc := make(chan struct{})
+	go func() {
+		for {
+			in, err := stream.Recv()
+			if err == io.EOF {
+				close(waitc)
+				return
+			}
+			if err != nil {
+				log.Fatalf("Failed to receive a note : %v", err)
+			}
+			log.Printf("Got message %s at point(%d, %d)", in.Message, in.Location.Latitude, in.Location.Longitude)
+		}
+	}()
+	for _, note := range notes {
+		if err := stream.Send(note); err != nil {
+			log.Fatalf("client.RouteChat: stream.Send(%v) failed: %v", note, err)
+		}
+	}
+	stream.CloseSend()
+	<-waitc
+}
+
 func randomPoint(r *rand.Rand) *streaming_example.Point {
 	lat := (r.Int31n(180) - 90) * 1e7
 	long := (r.Int31n(360) - 180) * 1e7
@@ -103,19 +142,22 @@ func main() {
 	}(conn)
 
 	client := streaming_example.NewRouteGuideClient(conn)
+	/*
+		// Looking for a valid feature
+		printFeature(client, &streaming_example.Point{Latitude: 409146138, Longitude: -746188906})
 
-	// Looking for a valid feature
-	printFeature(client, &streaming_example.Point{Latitude: 409146138, Longitude: -746188906})
+		// Feature missing.
+		printFeature(client, &streaming_example.Point{Latitude: 0, Longitude: 0})
 
-	// Feature missing.
-	printFeature(client, &streaming_example.Point{Latitude: 0, Longitude: 0})
+		// Looking for features between 40, -75 and 42, -73.
+		printFeatures(client, &streaming_example.Rectangle{
+			Lo: &streaming_example.Point{Latitude: 400000000, Longitude: -750000000},
+			Hi: &streaming_example.Point{Latitude: 420000000, Longitude: -730000000},
+		})
 
-	// Looking for features between 40, -75 and 42, -73.
-	printFeatures(client, &streaming_example.Rectangle{
-		Lo: &streaming_example.Point{Latitude: 400000000, Longitude: -750000000},
-		Hi: &streaming_example.Point{Latitude: 420000000, Longitude: -730000000},
-	})
-
-	// RecordRoute
-	runRecordRoute(client)
+		// RecordRoute
+		runRecordRoute(client)
+	*/
+	// RouteChat
+	runRouteChat(client)
 }

@@ -120,6 +120,7 @@ func (s *routeGuideServer) RouteChat(stream streaming_example.RouteGuide_RouteCh
 		s.mu.Unlock()
 
 		for _, note := range rn {
+			fmt.Println("sending note => ", note)
 			if err := stream.Send(note); err != nil {
 				fmt.Println("error in RouteChat")
 				return err
@@ -142,7 +143,9 @@ func main() {
 }
 
 func newServer() *routeGuideServer {
-	s := &routeGuideServer{}
+	s := &routeGuideServer{
+		routeNodes: make(map[string][]*streaming_example.RouteNote),
+	}
 	s.loadFeatures()
 	return s
 }
