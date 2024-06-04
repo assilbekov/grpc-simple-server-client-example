@@ -33,16 +33,6 @@ type RouteGuideClient interface {
 	// repeated field), as the rectangle may cover a large area and contain a
 	// huge number of features.
 	ListFeatures(ctx context.Context, in *Rectangle, opts ...grpc.CallOption) (RouteGuide_ListFeaturesClient, error)
-	// A client-to-server streaming RPC.
-	//
-	// Accepts a stream of Points on a route being traversed, returning a
-	// RouteSummary when traversal is completed.
-	RecordRoute(ctx context.Context, opts ...grpc.CallOption) (RouteGuide_RecordRouteClient, error)
-	// A Bidirectional streaming RPC.
-	//
-	// Accepts a stream of RouteNotes sent while a route is being traversed,
-	// while receiving other RouteNotes (e.g. from other users).
-	RouteChat(ctx context.Context, opts ...grpc.CallOption) (RouteGuide_RouteChatClient, error)
 }
 
 type routeGuideClient struct {
@@ -94,71 +84,6 @@ func (x *routeGuideListFeaturesClient) Recv() (*Feature, error) {
 	return m, nil
 }
 
-func (c *routeGuideClient) RecordRoute(ctx context.Context, opts ...grpc.CallOption) (RouteGuide_RecordRouteClient, error) {
-	stream, err := c.cc.NewStream(ctx, &RouteGuide_ServiceDesc.Streams[1], "/RouteGuide/RecordRoute", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &routeGuideRecordRouteClient{stream}
-	return x, nil
-}
-
-type RouteGuide_RecordRouteClient interface {
-	Send(*Point) error
-	CloseAndRecv() (*RouteSummary, error)
-	grpc.ClientStream
-}
-
-type routeGuideRecordRouteClient struct {
-	grpc.ClientStream
-}
-
-func (x *routeGuideRecordRouteClient) Send(m *Point) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *routeGuideRecordRouteClient) CloseAndRecv() (*RouteSummary, error) {
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	m := new(RouteSummary)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *routeGuideClient) RouteChat(ctx context.Context, opts ...grpc.CallOption) (RouteGuide_RouteChatClient, error) {
-	stream, err := c.cc.NewStream(ctx, &RouteGuide_ServiceDesc.Streams[2], "/RouteGuide/RouteChat", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &routeGuideRouteChatClient{stream}
-	return x, nil
-}
-
-type RouteGuide_RouteChatClient interface {
-	Send(*RouteNote) error
-	Recv() (*RouteNote, error)
-	grpc.ClientStream
-}
-
-type routeGuideRouteChatClient struct {
-	grpc.ClientStream
-}
-
-func (x *routeGuideRouteChatClient) Send(m *RouteNote) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *routeGuideRouteChatClient) Recv() (*RouteNote, error) {
-	m := new(RouteNote)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 // RouteGuideServer is the server API for RouteGuide service.
 // All implementations must embed UnimplementedRouteGuideServer
 // for forward compatibility
@@ -174,16 +99,6 @@ type RouteGuideServer interface {
 	// repeated field), as the rectangle may cover a large area and contain a
 	// huge number of features.
 	ListFeatures(*Rectangle, RouteGuide_ListFeaturesServer) error
-	// A client-to-server streaming RPC.
-	//
-	// Accepts a stream of Points on a route being traversed, returning a
-	// RouteSummary when traversal is completed.
-	RecordRoute(RouteGuide_RecordRouteServer) error
-	// A Bidirectional streaming RPC.
-	//
-	// Accepts a stream of RouteNotes sent while a route is being traversed,
-	// while receiving other RouteNotes (e.g. from other users).
-	RouteChat(RouteGuide_RouteChatServer) error
 	mustEmbedUnimplementedRouteGuideServer()
 }
 
@@ -196,12 +111,6 @@ func (UnimplementedRouteGuideServer) GetFeature(context.Context, *Point) (*Featu
 }
 func (UnimplementedRouteGuideServer) ListFeatures(*Rectangle, RouteGuide_ListFeaturesServer) error {
 	return status.Errorf(codes.Unimplemented, "method ListFeatures not implemented")
-}
-func (UnimplementedRouteGuideServer) RecordRoute(RouteGuide_RecordRouteServer) error {
-	return status.Errorf(codes.Unimplemented, "method RecordRoute not implemented")
-}
-func (UnimplementedRouteGuideServer) RouteChat(RouteGuide_RouteChatServer) error {
-	return status.Errorf(codes.Unimplemented, "method RouteChat not implemented")
 }
 func (UnimplementedRouteGuideServer) mustEmbedUnimplementedRouteGuideServer() {}
 
@@ -255,58 +164,6 @@ func (x *routeGuideListFeaturesServer) Send(m *Feature) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _RouteGuide_RecordRoute_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(RouteGuideServer).RecordRoute(&routeGuideRecordRouteServer{stream})
-}
-
-type RouteGuide_RecordRouteServer interface {
-	SendAndClose(*RouteSummary) error
-	Recv() (*Point, error)
-	grpc.ServerStream
-}
-
-type routeGuideRecordRouteServer struct {
-	grpc.ServerStream
-}
-
-func (x *routeGuideRecordRouteServer) SendAndClose(m *RouteSummary) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *routeGuideRecordRouteServer) Recv() (*Point, error) {
-	m := new(Point)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func _RouteGuide_RouteChat_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(RouteGuideServer).RouteChat(&routeGuideRouteChatServer{stream})
-}
-
-type RouteGuide_RouteChatServer interface {
-	Send(*RouteNote) error
-	Recv() (*RouteNote, error)
-	grpc.ServerStream
-}
-
-type routeGuideRouteChatServer struct {
-	grpc.ServerStream
-}
-
-func (x *routeGuideRouteChatServer) Send(m *RouteNote) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *routeGuideRouteChatServer) Recv() (*RouteNote, error) {
-	m := new(RouteNote)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 // RouteGuide_ServiceDesc is the grpc.ServiceDesc for RouteGuide service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -324,17 +181,6 @@ var RouteGuide_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "ListFeatures",
 			Handler:       _RouteGuide_ListFeatures_Handler,
 			ServerStreams: true,
-		},
-		{
-			StreamName:    "RecordRoute",
-			Handler:       _RouteGuide_RecordRoute_Handler,
-			ClientStreams: true,
-		},
-		{
-			StreamName:    "RouteChat",
-			Handler:       _RouteGuide_RouteChat_Handler,
-			ServerStreams: true,
-			ClientStreams: true,
 		},
 	},
 	Metadata: "api/streaming_example.proto",
